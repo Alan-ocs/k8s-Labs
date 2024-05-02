@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: audiobooks-pv
+spec:
+  capacity:
+    storage: 50Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: </path/to/audiobooks>
+
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: audiobooks-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: audiobookshelf-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: audiobookshelf
+  template:
+    metadata:
+      labels:
+        app: audiobookshelf
+    spec:
+      containers:
+      - name: audiobookshelf
+        image: ghcr.io/advplyr/audiobookshelf:latest
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: audiobooks-volume
+          mountPath: /audiobooks
+        - name: podcasts-volume
+          mountPath: /podcasts
+        - name: config-volume
+          mountPath: /config
+        - name: metadata-volume
+          mountPath: /metadata
+        env:
+        - name: TZ
+          value: "America/Sao_Paulo"
+      volumes:
+      - name: audiobooks-volume
+        persistentVolumeClaim:
+          claimName: audiobooks-pvc
+      - name: podcasts-volume
+        hostPath:
+          path: </path/to/podcasts>
+      - name: config-volume
+        hostPath:
+          path: </path/to/config>
+      - name: metadata-volume
+        hostPath:
+          path: </path/to/metadata>
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: audiobookshelf-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: audiobookshelf
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
